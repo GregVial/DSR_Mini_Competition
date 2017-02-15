@@ -3,20 +3,25 @@
 import pandas as pd
 import numpy as np
 
-input = pd.read_csv("data/sanitized.csv")
-input.set_index("Grant.Application.ID",drop=True,inplace=True)
-input.index.name=None
-input.isnull().any()
+# input = pd.read_csv("data/sanitized.csv")
+# input.set_index("Grant.Application.ID",drop=True,inplace=True)
+# input.index.name=None
+# input.isnull().any()
+#
+# # COPIED FROM NOTEBOOK:
+# from sklearn.model_selection import train_test_split, GridSearchCV
+#
+# input.fillna(value=0,inplace=True)
+# X = input.ix[:,1:]
+# y = input.ix[:,0]
+# X.shape
+# X_train, X_test, y_train, y_test = train_test_split(X,y,test_size=.2,random_state=131078)
+# X.shape
 
-# COPIED FROM NOTEBOOK:
-from sklearn.model_selection import train_test_split, GridSearchCV
-
-input.fillna(value=0,inplace=True)
-X = input.ix[:,1:]
-y = input.ix[:,0]
-X.shape
-X_train, X_test, y_train, y_test = train_test_split(X,y,test_size=.2,random_state=131078)
-X.shape
+X_train = pd.read_csv("data/X_train.csv")
+X_test = pd.read_csv("data/X_test.csv")
+y_train = pd.read_csv("data/y_train.csv")
+y_test = pd.read_csv("data/y_test.csv")
 
 # COPY FROM BELOW INTO NOTEBOOK:
 from sklearn import svm
@@ -59,7 +64,7 @@ X_test_std = scaler.transform(X_test)
 
 log_r = LogisticRegression(penalty='l2', C=1.0, solver = 'sag', n_jobs=-1)
 log_r.fit(X_train, y_train)
-print('Starting LR Grid Search')
+print('Starting net Grid Search')
 lr_gs = GridSearchCV(log_r, param_grid={'C':[0.01, 0.1, 1, 10]})
 lr_gs.fit(X_train_std, y_train)
 log_r = lr_gs.best_estimator_
@@ -70,3 +75,37 @@ lr_roc = roc_auc_score(y_test, y_pred_lr)
 
 print('LR Accuracy is ' + str(lr_accuracy))
 print('LR ROC Area Under Curve is ' + str(lr_roc))
+
+# neural network
+from keras.models import Sequential
+from keras.layers import Dense, Dropout
+from keras.optimizers import adam
+
+pred_net_D = {
+    'model': {'Input Layer': Dense(num_nodes, input_dim=input_length, activation='relu'),
+              'Hidden Layer': Dense(num_nodes, activation='relu'),
+              'Output Layer': Dense(output_dim=1, activation='linear')}}
+
+# defining layers for prediction network
+pred_net_params = pred_net_D['model']  # change to pred_net_D[mdl] if using different mdl structure for each run
+input_layer = Dense(500, input_dim=input_length, activation='relu')
+hidden_layer = Dense(500, activation='relu')
+output_layer = Dense(output_dim=1, activation='linear')
+
+# creating keras model
+network = Sequential()
+network.add(input_layer)
+network.add(Dropout(dropout_fraction))
+network.add(hidden_layer)
+network.add(Dropout(dropout_fraction))
+network.add(hidden_layer)
+network.add(Dropout(dropout_fraction))
+network.add(output_layer)
+network.compile(loss='mean_squared_error', optimizer=adam)
+
+history = network.fit(X_train, y_train)
+y_pred_net = network.predict(X_test)
+net_accuracy = np.mean(y_pred_net == y_test)
+net_roc = roc_auc_score(y_test, y_pred_net)
+print('NN Accuracy is ' + str(net_accuracy))
+print('NN ROC Area Under Curve is ' + str(net_roc))
