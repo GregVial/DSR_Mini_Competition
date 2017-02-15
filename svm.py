@@ -21,14 +21,19 @@ import numpy as np
 X_train = pd.read_csv("data/X_train.csv")
 X_test = pd.read_csv("data/X_test.csv")
 y_train = pd.read_csv("data/y_train.csv")
+y_train.drop('Grant.Application.ID', axis=1, inplace=True)
+y_train = y_train.values.reshape(-1)
+
 y_test = pd.read_csv("data/y_test.csv")
+y_test.drop('Grant.Application.ID', axis=1, inplace=True)
+y_test = y_test.values.reshape(-1)
 
 # COPY FROM BELOW INTO NOTEBOOK:
 from sklearn import svm
 from sklearn.metrics import roc_auc_score
 
 # two different sklearn svm models:
-s_vec = svm.SVC(C=1, kernel='linear')
+s_vec = svm.SVC(C=1, kernel='linear', verbose=2)
 # s_vec = svm.NuSVC(nu=0.5, kernel = 'linear')
 
 from sklearn.model_selection import GridSearchCV
@@ -36,7 +41,7 @@ from sklearn.model_selection import GridSearchCV
 
 # NOT DOING CROSS VALIDATION
 print('Starting SVM Grid Search')
-svm_gs = GridSearchCV(s_vec, param_grid={'C':[0.01, 0.1, 1, 10],'kernel':['linear', 'rbf']})
+svm_gs = GridSearchCV(s_vec, param_grid={'C':[1],'kernel':['linear', 'rbf']})
 svm_gs.fit(X_train, y_train)
 
 s_vec = svm_gs.best_estimator_
@@ -55,17 +60,15 @@ svm_confusion = pd.DataFrame(svm_conmat, index=['not_granted', 'granted'],column
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
-# need to standardize
 scaler = StandardScaler()
 scaler.fit(X_train)
-
 X_train_std = scaler.transform(X_train)
 X_test_std = scaler.transform(X_test)
 
 log_r = LogisticRegression(penalty='l2', C=1.0, solver = 'sag', n_jobs=-1)
-log_r.fit(X_train, y_train)
+log_r.fit(X_train_std, y_train)
 print('Starting net Grid Search')
-lr_gs = GridSearchCV(log_r, param_grid={'C':[0.01, 0.1, 1, 10]})
+lr_gs = GridSearchCV(log_r, param_grid={'C':[1]})
 lr_gs.fit(X_train_std, y_train)
 log_r = lr_gs.best_estimator_
 
@@ -81,10 +84,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Dropout
 from keras.optimizers import adam
 
-pred_net_D = {
-    'model': {'Input Layer': Dense(num_nodes, input_dim=input_length, activation='relu'),
-              'Hidden Layer': Dense(num_nodes, activation='relu'),
-              'Output Layer': Dense(output_dim=1, activation='linear')}}
+input_length = X_train.shape[1]
 
 # defining layers for prediction network
 pred_net_params = pred_net_D['model']  # change to pred_net_D[mdl] if using different mdl structure for each run
@@ -103,9 +103,10 @@ network.add(Dropout(dropout_fraction))
 network.add(output_layer)
 network.compile(loss='mean_squared_error', optimizer=adam)
 
-history = network.fit(X_train, y_train)
-y_pred_net = network.predict(X_test)
+history = network.fit(X_train_std, y_train)
+y_pred_net = network.predict(X_test_std)
 net_accuracy = np.mean(y_pred_net == y_test)
 net_roc = roc_auc_score(y_test, y_pred_net)
+
 print('NN Accuracy is ' + str(net_accuracy))
 print('NN ROC Area Under Curve is ' + str(net_roc))
