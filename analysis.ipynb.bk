@@ -1,0 +1,570 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 108,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "# Initialize environment\n",
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "%matplotlib inline"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 109,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "D:\\Users\\greg_\\Anaconda3\\lib\\site-packages\\IPython\\core\\interactiveshell.py:2717: DtypeWarning: Columns (90,105,119,120,123,124,132,134,135,138,139,147,149,150,153,154,162,164,165,168,169,177,179,183,184,192,194,198,199,207,209,213,214,224,237,239,244) have mixed types. Specify dtype option on import or set low_memory=False.\n",
+      "  interactivity=interactivity, compiler=compiler, result=result)\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Load the data\n",
+    "data = pd.read_csv(\"data/unimelb_training.csv\")\n",
+    "data.set_index(\"Grant.Application.ID\",drop=True,inplace=True)\n",
+    "data.index.name=None"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 110,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "# Exclude the person information\n",
+    "data = data.ix[:,:25]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 111,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "# Fill missing Contract.Value.Band\n",
+    "# Hard-code to A as more clever imputation methods have suggested this is the most likely value\n",
+    "data['Contract.Value.Band...see.note.A'].fillna(value=\"A\",inplace=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 112,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "# Parameter for dummy_na generation\n",
+    "dummy = True"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 113,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "# Create dummies for Sponsor.Code\n",
+    "data = pd.concat([data,pd.get_dummies(data[\"Sponsor.Code\"],prefix=\"Sponsor\",dummy_na=dummy)],axis=1)\n",
+    "data.drop(\"Sponsor.Code\",axis=1,inplace=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 114,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "# Create dummies for Grant.Category.Code\n",
+    "data = pd.concat([data,pd.get_dummies(data[\"Grant.Category.Code\"],prefix=\"Cat\",dummy_na=dummy)],axis=1)\n",
+    "data.drop(\"Grant.Category.Code\",axis=1,inplace=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 115,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "# Deal with date\n",
+    "\n",
+    "a = pd.to_datetime(data[\"Start.date\"])\n",
+    "year = pd.Series([date.year for date in a],name=\"year\")\n",
+    "month = pd.Series([date.month for date in a],name=\"month\")\n",
+    "day = pd.Series([date.day for date in a],name=\"day\")\n",
+    "data[\"Start.year\"] = year\n",
+    "data[\"Start.month\"] = month\n",
+    "data[\"Start.day\"] = day\n",
+    "\n",
+    "# one hot encoding\n",
+    "data = pd.concat([data,pd.get_dummies(data[\"Start.year\"],prefix=\"Year\",dummy_na=dummy)],axis=1)\n",
+    "data = pd.concat([data,pd.get_dummies(data[\"Start.month\"],prefix=\"Month\",dummy_na=dummy)],axis=1)\n",
+    "data = pd.concat([data,pd.get_dummies(data[\"Start.day\"],prefix=\"Day\",dummy_na=dummy)],axis=1)\n",
+    "\n",
+    "data.drop([\"Start.date\"],axis=1,inplace=True)\n",
+    "data.drop([\"Start.year\"],axis=1,inplace=True)\n",
+    "data.drop([\"Start.month\"],axis=1,inplace=True)\n",
+    "data.drop([\"Start.day\"],axis=1,inplace=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 116,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "# Create dummies for Contract.Val\n",
+    "data = pd.concat([data,pd.get_dummies(data[\"Contract.Value.Band...see.note.A\"],prefix=\"Contract\")],axis=1)\n",
+    "data.drop(\"Contract.Value.Band...see.note.A\",axis=1,inplace=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 117,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "# Create dummies for RFCD\n",
+    "# This is left out as it didn't seem to improve the model\n",
+    "sub1 = pd.DataFrame(data.ix[:,1:3])\n",
+    "sub1.rename(columns={\"RFCD.Code.1\":\"RFCD.Code\",\n",
+    "                     \"RFCD.Percentage.1\":\"RFCD.Percentage\"},inplace=True)\n",
+    "\n",
+    "sub2 = pd.DataFrame(data.ix[:,3:5])\n",
+    "sub2.rename(columns={\"RFCD.Code.2\":\"RFCD.Code\",\n",
+    "                     \"RFCD.Percentage.2\":\"RFCD.Percentage\"},inplace=True)\n",
+    "\n",
+    "sub3 = pd.DataFrame(data.ix[:,5:7])\n",
+    "sub3.rename(columns={\"RFCD.Code.3\":\"RFCD.Code\",\n",
+    "                     \"RFCD.Percentage.3\":\"RFCD.Percentage\"},inplace=True)\n",
+    "\n",
+    "sub4 = pd.DataFrame(data.ix[:,7:9])\n",
+    "sub4.rename(columns={\"RFCD.Code.4\":\"RFCD.Code\",\n",
+    "                     \"RFCD.Percentage.4\":\"RFCD.Percentage\"},inplace=True)\n",
+    "\n",
+    "sub5 = pd.DataFrame(data.ix[:,9:11])\n",
+    "sub5.rename(columns={\"RFCD.Code.5\":\"RFCD.Code\",\n",
+    "                     \"RFCD.Percentage.5\":\"RFCD.Percentage\"},inplace=True)\n",
+    "\n",
+    "RFCD = sub1.append(sub2,ignore_index=False)\n",
+    "RFCD = RFCD.append(sub3,ignore_index=False)\n",
+    "RFCD = RFCD.append(sub4,ignore_index=False)\n",
+    "RFCD = RFCD.append(sub4,ignore_index=False)\n",
+    "\n",
+    "RFCD[RFCD[\"RFCD.Code\"].isnull()]=0\n",
+    "\n",
+    "piv = pd.pivot_table(RFCD,columns=\"RFCD.Code\",index=RFCD.index,fill_value=0,dropna=False)\n",
+    "piv[piv.isnull()]=0\n",
+    "piv.index.name=None\n",
+    "\n",
+    "#data = pd.concat([data,piv],axis=1)\n",
+    "data.drop([\"RFCD.Code.1\",\"RFCD.Percentage.1\",\n",
+    "           \"RFCD.Code.2\",\"RFCD.Percentage.2\",\n",
+    "           \"RFCD.Code.3\",\"RFCD.Percentage.3\",\n",
+    "           \"RFCD.Code.4\",\"RFCD.Percentage.4\",\n",
+    "           \"RFCD.Code.5\",\"RFCD.Percentage.5\",],axis=1,inplace=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 118,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "# Create dummies for SEO\n",
+    "# This is left out as it didn't seem to improve the model\n",
+    "sub1 = pd.DataFrame(data.ix[:,1:3])\n",
+    "sub1.rename(columns={\"SEO.Code.1\":\"SEO.Code\",\n",
+    "                     \"SEO.Percentage.1\":\"SEO.Percentage\"},inplace=True)\n",
+    "\n",
+    "sub2 = pd.DataFrame(data.ix[:,3:5])\n",
+    "sub2.rename(columns={\"SEO.Code.2\":\"SEO.Code\",\n",
+    "                     \"SEO.Percentage.2\":\"SEO.Percentage\"},inplace=True)\n",
+    "\n",
+    "sub3 = pd.DataFrame(data.ix[:,5:7])\n",
+    "sub3.rename(columns={\"SEO.Code.3\":\"SEO.Code\",\n",
+    "                     \"SEO.Percentage.3\":\"SEO.Percentage\"},inplace=True)\n",
+    "\n",
+    "sub4 = pd.DataFrame(data.ix[:,7:9])\n",
+    "sub4.rename(columns={\"SEO.Code.4\":\"SEO.Code\",\n",
+    "                     \"SEO.Percentage.4\":\"SEO.Percentage\"},inplace=True)\n",
+    "\n",
+    "sub5 = pd.DataFrame(data.ix[:,9:11])\n",
+    "sub5.rename(columns={\"SEO.Code.5\":\"SEO.Code\",\n",
+    "                     \"SEO.Percentage.5\":\"SEO.Percentage\"},inplace=True)\n",
+    "\n",
+    "SEO = sub1.append(sub2,ignore_index=False)\n",
+    "SEO = SEO.append(sub3,ignore_index=False)\n",
+    "SEO = SEO.append(sub4,ignore_index=False)\n",
+    "SEO = SEO.append(sub4,ignore_index=False)\n",
+    "\n",
+    "SEO[SEO[\"SEO.Code\"].isnull()]=0\n",
+    "\n",
+    "piv = pd.pivot_table(SEO,columns=\"SEO.Code\",index=RFCD.index,fill_value=0,dropna=False)\n",
+    "piv[piv.isnull()]=0\n",
+    "piv.index.name=None\n",
+    "\n",
+    "#data = pd.concat([data,piv],axis=1)\n",
+    "data.drop([\"SEO.Code.1\",\"SEO.Percentage.1\",\n",
+    "           \"SEO.Code.2\",\"SEO.Percentage.2\",\n",
+    "           \"SEO.Code.3\",\"SEO.Percentage.3\",\n",
+    "           \"SEO.Code.4\",\"SEO.Percentage.4\",\n",
+    "           \"SEO.Code.5\",\"SEO.Percentage.5\",],axis=1,inplace=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 119,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "D:\\Users\\greg_\\Anaconda3\\lib\\site-packages\\IPython\\core\\interactiveshell.py:2717: DtypeWarning: Columns (90,105,119,120,123,124,132,134,135,138,139,147,149,150,153,154,162,164,165,168,169,177,179,183,184,192,194,198,199,207,209,213,214,224,237,239,244) have mixed types. Specify dtype option on import or set low_memory=False.\n",
+      "  interactivity=interactivity, compiler=compiler, result=result)\n",
+      "D:\\Users\\greg_\\Anaconda3\\lib\\site-packages\\ipykernel\\__main__.py:112: FutureWarning: sort(columns=....) is deprecated, use sort_values(by=.....)\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Deal with person information\n",
+    "\n",
+    "raw = pd.read_csv(\"data/unimelb_training.csv\")\n",
+    "\n",
+    "people = pd.DataFrame()\n",
+    "time_at_uni = pd.DataFrame()\n",
+    "for col in raw.columns:\n",
+    "    col_list = list(raw.columns) # list so I can use index later\n",
+    "\n",
+    "    if col[:10] == 'Person.ID.':\n",
+    "        col_start = col_list.index(col)\n",
+    "        col_end = col_start + 15 # hard coded\n",
+    "        person = raw.iloc[:,col_start:col_end]\n",
+    "        \n",
+    "       \n",
+    "        # including our ID and status\n",
+    "        person.loc[:,'Grant.Application.ID'] = raw.loc[:,'Grant.Application.ID']\n",
+    "        person.loc[:,'Grant.Status'] = raw.loc[:,'Grant.Status']\n",
+    "\n",
+    "        col_names = list(person.columns)\n",
+    "        col_names = [col.strip('0123456789') for col in col_names] # removes all numbers\n",
+    "        person.columns = col_names\n",
+    "        #print(len(person))\n",
+    "        \n",
+    "        # Dealing with missing IDs\n",
+    "        id_ = person.loc[:,\"Person.ID.\"]\n",
+    "        id_missing = [np.isnan(i) for i in id_]\n",
+    "        #print(id_missing[50:60])\n",
+    "        role = person.loc[:,\"Role.\"]\n",
+    "        #print(role[50:60])\n",
+    "        role_not_missing = [not pd.isnull(r) for r in role]\n",
+    "        #print(role_not_missing[50:60])\n",
+    "        no_id = [(i&r) for (i,r) in zip(id_missing,role_not_missing)]\n",
+    "        #print(no_id[50:60])\n",
+    "        person.loc[:,\"Person.ID.\"] = np.where(no_id,0,person.loc[:,\"Person.ID.\"])\n",
+    "        #print(person.loc[50:60,\"Person.ID.\"])\n",
+    "\n",
+    "        # dealing with number of years at uni\n",
+    "        original = person.loc[:,'No..of.Years.in.Uni.at.Time.of.Grant.'].astype(str)\n",
+    "        transformed = [0 for _ in range(original.size)]\n",
+    "        transformed = np.where(original==\">=0 to 5\",2.5,transformed)\n",
+    "        transformed = np.where(original==\">5 to 10\",7.5,transformed)\n",
+    "        transformed = np.where(original==\">10 to 15\",12.5,transformed)\n",
+    "        transformed = np.where(original==\"more than 15\",20,transformed)\n",
+    "        transformed = pd.DataFrame(transformed)\n",
+    "\n",
+    "        person[\"No..of.Years.in.Uni.at.Time.of.Grant.\"] = transformed\n",
+    "        #person = pd.concat([person, transformed], axis=1)\n",
+    "        people = people.append(person, ignore_index=True)\n",
+    "        #print(people.loc[:,\"Person.ID.\"])\n",
+    "\n",
+    "# summaries for team\n",
+    "#num_ppl = len(people) / len(person) # should be 15!\n",
+    "people.index = people.loc[:,'Grant.Application.ID']\n",
+    "num_ppl = pd.Series(people.groupby(['Grant.Application.ID'])['Person.ID.'].count(),name=\"Person.ID.\") # include\n",
+    "#num_ppl = np.where(num_ppl==0,1,num_ppl)\n",
+    "#print(num_ppl)\n",
+    "\n",
+    "num_birth_years = people.groupby(['Grant.Application.ID'])['Year.of.Birth.'].count()\n",
+    "total_birth_year = people.groupby(['Grant.Application.ID'])['Year.of.Birth.'].sum()\n",
+    "avg_birth_year = total_birth_year / num_birth_years\n",
+    "\n",
+    "total_birth_year = people.groupby(['Grant.Application.ID'])['Year.of.Birth.'].sum()\n",
+    "avg_birth_year = pd.Series(people.groupby(['Grant.Application.ID'])['Year.of.Birth.'].mean(),name=\"Birth.Mean\")\n",
+    "std_birth_year = pd.Series(people.groupby(['Grant.Application.ID'])['Year.of.Birth.'].std(),name=\"Birth.std\")\n",
+    "std_birth_year[std_birth_year.isnull()]=0\n",
+    "min_birth_year = pd.Series(people.groupby(['Grant.Application.ID'])['Year.of.Birth.'].min(),name=\"Birth.min\")\n",
+    "max_birth_year = pd.Series(people.groupby(['Grant.Application.ID'])['Year.of.Birth.'].max(),name=\"Birth.max\")\n",
+    "\n",
+    "avg_no_years_uni = pd.Series(people.groupby(['Grant.Application.ID'])['No..of.Years.in.Uni.at.Time.of.Grant.'].mean(),name=\"Years.Uni.avg\")\n",
+    "std_no_years_uni = pd.Series(people.groupby(['Grant.Application.ID'])['No..of.Years.in.Uni.at.Time.of.Grant.'].std(),name=\"Years.Uni.std\")\n",
+    "std_no_years_uni[std_no_years_uni.isnull()]=0\n",
+    "min_no_years_uni = pd.Series(people.groupby(['Grant.Application.ID'])['No..of.Years.in.Uni.at.Time.of.Grant.'].min(),name=\"Years.Uni.min\")\n",
+    "max_no_years_uni = pd.Series(people.groupby(['Grant.Application.ID'])['No..of.Years.in.Uni.at.Time.of.Grant.'].max(),name=\"Years.Uni.max\")\n",
+    "\n",
+    "\n",
+    "num_successful = pd.Series(people.groupby(['Grant.Application.ID'])['Number.of.Successful.Grant.'].sum(),name=\"num_succ\")\n",
+    "num_unsuccessful = pd.Series(people.groupby(['Grant.Application.ID'])['Number.of.Unsuccessful.Grant.'].sum(),name=\"num_unsucc\")\n",
+    "ratio_successful = pd.Series(num_successful/(num_successful+num_unsuccessful),name=\"Ratio.Successful\")\n",
+    "ratio_successful[ratio_successful.isnull()]=0\n",
+    "\n",
+    "# number of phds - TODO could be improved\n",
+    "people[\"With.PHD.\"] = np.where(people[\"With.PHD.\"]==\"Yes\",1,0)\n",
+    "num_phd  = pd.Series(people.groupby(['Grant.Application.ID'])['With.PHD.'].sum(),name=\"phd.count\") # assuming only value ever entered is yes # include\n",
+    "mean_phd = pd.Series(people.groupby(['Grant.Application.ID'])['With.PHD.'].mean(),name=\"phd.mean\")# assuming only value ever entered is yes # include\n",
+    "\n",
+    "\n",
+    "# Mysterious variables\n",
+    "a__1 = pd.Series(people.groupby(['Grant.Application.ID'])['A..'].sum(),name=\"a..1.sum\") \n",
+    "a_1 = pd.Series(people.groupby(['Grant.Application.ID'])['A.'].sum(),name=\"a.1.sum\") \n",
+    "b_1 = pd.Series(people.groupby(['Grant.Application.ID'])['B.'].sum(),name=\"b.1.sum\")\n",
+    "c_1 = pd.Series(people.groupby(['Grant.Application.ID'])['C.'].sum(),name=\"c.1.sum\")\n",
+    "avg_a__1 = pd.Series(people.groupby(['Grant.Application.ID'])['A..'].mean(),name=\"a..1.avg\")  \n",
+    "avg_a_1 = pd.Series(people.groupby(['Grant.Application.ID'])['A.'].mean(),name=\"a.1.avg\")  \n",
+    "avg_b_1 = pd.Series(people.groupby(['Grant.Application.ID'])['B.'].mean(),name=\"b..1.avg\")  \n",
+    "avg_c_1 = pd.Series(people.groupby(['Grant.Application.ID'])['C.'].mean(),name=\"c..1.avg\")  \n",
+    "\n",
+    "# Faculty\n",
+    "fac = pd.Series(people.groupby(['Grant.Application.ID'])['Faculty.No..'].mean(),name=\"faculty\")\n",
+    "\n",
+    "# Department number\n",
+    "dept_no = pd.Series(people.groupby(['Grant.Application.ID'])['Dept.No..'].mean(),name=\"dept_no\")\n",
+    "\n",
+    "# creating DF with summary statistics for each person\n",
+    "people_summary = pd.DataFrame()\n",
+    "ppl_groupby = people.groupby(['Person.ID.'])\n",
+    "people_summary.loc[:,'Num applications'] = ppl_groupby['Grant.Application.ID'].count()\n",
+    "people_summary.loc[:,'Num grant status'] = ppl_groupby['Grant.Status'].sum()\n",
+    "people_summary.loc[:,'Num successful'] = ppl_groupby['Number.of.Successful.Grant.'].sum()\n",
+    "people_summary.loc[:,'Num unsuccessful'] = ppl_groupby['Number.of.Unsuccessful.Grant.'].sum()\n",
+    "people_summary.loc[:,'Ratio'] = people_summary.loc[:,'Num successful'] / (people_summary.loc[:,'Num unsuccessful'] + people_summary.loc[:,'Num successful'])\n",
+    "people_summary.sort(columns=['Ratio'], ascending=False, inplace=True)\n",
+    "\n",
+    "# Number of persons per role type\n",
+    "roles = people[\"Role.\"].reset_index().pivot_table(columns=\"Role.\",index=people.index,aggfunc=len,fill_value=0)\n",
+    "#roles.fillna(value=0,inplace=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 120,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "# Concatenate the non person and person aggregated info in a singe \"input\" dataframe\n",
+    "\n",
+    "# Number of people in the team\n",
+    "input = pd.concat([data,num_ppl],axis=1)\n",
+    "\n",
+    "# Year of birth\n",
+    "input = pd.concat([input,avg_birth_year],axis=1)\n",
+    "input = pd.concat([input,std_birth_year],axis=1)\n",
+    "input = pd.concat([input,min_birth_year],axis=1)\n",
+    "input = pd.concat([input,max_birth_year],axis=1)\n",
+    "\n",
+    "# Years in Uni \n",
+    "input = pd.concat([input,avg_no_years_uni],axis=1)\n",
+    "input = pd.concat([input,std_no_years_uni],axis=1)\n",
+    "input = pd.concat([input,min_no_years_uni],axis=1)\n",
+    "input = pd.concat([input,max_no_years_uni],axis=1)\n",
+    "\n",
+    "# Application success ratio\n",
+    "input = pd.concat([input,ratio_successful],axis=1)\n",
+    "input = pd.concat([input,num_successful],axis=1)\n",
+    "input = pd.concat([input,num_unsuccessful],axis=1)\n",
+    "\n",
+    "# PhDs in team\n",
+    "input = pd.concat([input,num_phd],axis=1)\n",
+    "input = pd.concat([input,mean_phd],axis=1)\n",
+    "\n",
+    "# Roles in team\n",
+    "input = pd.concat([input,roles],axis=1)\n",
+    "\n",
+    "# Faculty\n",
+    "input = pd.concat([input,fac],axis=1)\n",
+    "\n",
+    "# Department\n",
+    "input = pd.concat([input,dept_no],axis=1)\n",
+    "\n",
+    "# Mysterious variables\n",
+    "input = pd.concat([input,a__1],axis=1)\n",
+    "input = pd.concat([input,a_1],axis=1)\n",
+    "input = pd.concat([input,b_1],axis=1)\n",
+    "input = pd.concat([input,c_1],axis=1)\n",
+    "input = pd.concat([input,avg_a__1],axis=1)\n",
+    "input = pd.concat([input,avg_a_1],axis=1)\n",
+    "input = pd.concat([input,avg_b_1],axis=1)\n",
+    "input = pd.concat([input,avg_c_1],axis=1)\n",
+    "\n",
+    "# Cleaning\n",
+    "input.columns.name = None"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 121,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "# Concatenate the \"input\" dataframe and the person 1 info\n",
+    "\n",
+    "col_names = [\"ID.1\",\"Role.1\",\"Year.1\",\"Country.1\",\"Language.1\",\"Dept.1\",\"Faculty.1\",\"PHD.1\",\"Years.Uni.1\",\"Success.1\",\"Unsucces.1\",\"A..1.1\",\"A.1.1\",\"B.1.1\",\"C.1.1\"]\n",
+    "person1 = people.iloc[:8708,:15]\n",
+    "person1.index.name = None\n",
+    "person1.columns = col_names\n",
+    "\n",
+    "from sklearn.preprocessing import LabelEncoder\n",
+    "roles = list(person1[\"Role.1\"])\n",
+    "le = LabelEncoder()\n",
+    "le.fit(roles)\n",
+    "roles_enc = le.transform(roles)\n",
+    "person1[\"Role.1\"] = roles_enc\n",
+    "\n",
+    "country = list(person1[\"Country.1\"])\n",
+    "le = LabelEncoder()\n",
+    "le.fit(roles)\n",
+    "country_enc = le.transform(roles)\n",
+    "person1[\"Country.1\"] = country_enc\n",
+    "\n",
+    "language = list(person1[\"Language.1\"])\n",
+    "le = LabelEncoder()\n",
+    "le.fit(language)\n",
+    "language_enc = le.transform(language)\n",
+    "person1[\"Language.1\"] = language_enc\n",
+    "\n",
+    "input2 = pd.concat([input,person1],axis=1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 122,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "(8708, 412) (8708, 427)\n",
+      "(8708, 427) (8708, 427)\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Decide whether we use non-person + peron aggregated with person1 or not\n",
+    "# to exclude person one, comment out the line \"input = input2\"\n",
+    "\n",
+    "print(input.shape,input2.shape)\n",
+    "\n",
+    "input.fillna(value=0,inplace=True)\n",
+    "input2.fillna(value=0,inplace=True)\n",
+    "\n",
+    "input = input2\n",
+    "\n",
+    "print(input.shape,input2.shape)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 123,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "# Create train/test split\n",
+    "testing_ids = pd.read_csv(\"data/testing_ids.csv\")\n",
+    "testing_ids = list(testing_ids.ix[:,0])\n",
+    "test = input.ix[testing_ids]\n",
+    "\n",
+    "all_ids = list(input.index)\n",
+    "train_ids = []\n",
+    "for i in all_ids:\n",
+    "    if not(i in testing_ids):\n",
+    "        train_ids.append(i)\n",
+    "\n",
+    "train = input.ix[train_ids]\n",
+    "\n",
+    "X_train = train.ix[:,1:]\n",
+    "y_train = train.ix[:,0]\n",
+    "X_test = test.ix[:,1:]\n",
+    "y_test = test.ix[:,0]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 124,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "# Save master input as well as train/test split to file\n",
+    "input.to_csv(\"data/sanitized.csv\")\n",
+    "X_train.to_csv(\"data/X_train.csv\")\n",
+    "X_test.to_csv(\"data/X_test.csv\")\n",
+    "y_train.to_csv(\"data/y_train.csv\",header=True)\n",
+    "y_test.to_csv(\"data/y_test.csv\",header=True)"
+   ]
+  }
+ ],
+ "metadata": {
+  "anaconda-cloud": {},
+  "kernelspec": {
+   "display_name": "Python [conda root]",
+   "language": "python",
+   "name": "conda-root-py"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.5.2"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 1
+}
